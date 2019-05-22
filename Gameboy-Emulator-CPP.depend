@@ -1,0 +1,4 @@
+# depslib dependency file v1.0
+1558525682 source:c:\users\ntl\documents\c++ project\gameboy-emulator-cpp\src\main.cpp
+	<SDL.h>
+
