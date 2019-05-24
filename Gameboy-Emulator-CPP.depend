@@ -1,4 +1,6 @@
 # depslib dependency file v1.0
-1558525682 source:c:\users\ntl\documents\c++ project\gameboy-emulator-cpp\src\main.cpp
+1558591197 source:c:\users\ntl\documents\c++ project\gameboy-emulator-cpp\src\main.cpp
 	<SDL.h>
+
+1558528559 source:c:\users\ntl\documents\c++ project\gameboy-emulator-cpp\src\cpu.cpp
 

@@ -4,6 +4,8 @@ class CPU {
 private:
     int a, b, c, d, e, h, l, f;
     int sp, pc;
+    int cur_m, tot_m;
+    int ime;
 public:
     void init();
     void LDrr_bb();
@@ -35,4 +37,38 @@ public:
     void LDrr_el();
     void LDrr_ea();
     void LDrr_hb();
+    void LDrr_hc();
+    void LDrr_hd();
+    void LDrr_he();
+    void LDrr_hh();
+    void LDrr_hl();
+    void LDrr_ha();
+    void LDrr_lb();
+    void LDrr_lc();
+    void LDrr_ld();
+    void LDrr_le();
+    void LDrr_lh();
+    void LDrr_ll();
+    void LDrr_la();
+    void LDrr_ab();
+    void LDrr_ac();
+    void LDrr_ad();
+    void LDrr_ae();
+    void LDrr_ah();
+    void LDrr_al();
+    void LDrr_aa();
+    void LDrHLm_b();
+    void LDrHLm_c();
+    void LDrHLm_d();
+    void LDrHLm_e();
+    void LDrHLm_h();
+    void LDrHLm_l();
+    void LDrHLm_a();
+    void LDHLmr_b();
+    void LDHLmr_c();
+    void LDHLmr_d();
+    void LDHLmr_e();
+    void LDHLmr_h();
+    void LDHLmr_l();
+    void LDHLmr_a();
 };
