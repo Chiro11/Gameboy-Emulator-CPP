@@ -1,6 +1,6 @@
 using namespace std;
 
-class MMU {
+class Memory {
 private:
 public:
     int rb(int addr);
