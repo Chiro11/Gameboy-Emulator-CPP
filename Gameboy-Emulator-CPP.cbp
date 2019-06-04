@@ -35,6 +35,8 @@
 		<Unit filename="src/CPU.h" />
 		<Unit filename="src/GPU.cpp" />
 		<Unit filename="src/GPU.h" />
+		<Unit filename="src/Key.cpp" />
+		<Unit filename="src/Key.h" />
 		<Unit filename="src/Memory.cpp" />
 		<Unit filename="src/Memory.h" />
 		<Unit filename="src/main.cpp" />

@@ -3,7 +3,10 @@
 #include <vector>
 #include <cstring>
 #include <fstream>
+#include "Key.h"
 using namespace std;
+
+extern Key key;
 
 class Memory {
 private:

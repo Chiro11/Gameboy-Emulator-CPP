@@ -34,15 +34,14 @@ void CPU::restore() {
 }
 
 int CPU::step() {
-    int id = memory.rb(pc++);
-    return ops[id]();
+    return ops[memory.rb(pc++)]();
 }
 
-//问题1: 关于f的0x80位
-//问题2: 忽略的指令 总数是否符合
-//问题3: 指令中的其它寄存器
-//问题4: 关于正负号的问题
-//问题5: 关于&0x01
+//关于f的0x80位
+//忽略的指令 总数是否符合
+//关于正负号的问题
+//关于&0x01
+//关于ime
 void CPU::opload() {
 ops[0x40] = [this]()->int{b=b; return 1;}; //LDrr_bb
 ops[0x41] = [this]()->int{b=c; return 1;}; //LDrr_bc
@@ -126,7 +125,6 @@ ops[0x11] = [this]()->int{e=memory.rb(pc); d=memory.rb(pc+1); pc+=2; return 3;};
 ops[0x21] = [this]()->int{l=memory.rb(pc); h=memory.rb(pc+1); pc+=2; return 3;}; //LDHLnn
 ops[0x31] = [this]()->int{sp=memory.rw(pc); pc+=2; return 3;}; //LDSPnn
 ops[0x36] = [this]()->int{int k=memory.rw(pc); l=memory.rb(k); h=memory.rb(k+1); pc+=2; return 5;}; //LDHLmm
-//ops[0x36] = [this]()->int{int k=memory.rw(pc); memory.ww(k, (h<<8)+l); pc+=2; return 5;} //LDmmHL
 ops[0x22] = [this]()->int{memory.wb((h<<8)+l, a); l=(l+1)&0xFF; if(!l) h=(h+1)&0xFF; return 2;}; //LDHLIA
 ops[0x2A] = [this]()->int{a=memory.rb((h<<8)+l); l=(l+1)&0xFF; if(!l) h=(h+1)&0xFF; return 2;}; //LDAHLI
 ops[0x32] = [this]()->int{memory.wb((h<<8)+l, a); l=(l-1)&0xFF; if(l==0xFF) h=(h-1)&0xFF; return 2;}; //LDHLDA
@@ -480,13 +478,6 @@ cbops[0x23] = [this]()->int{int k=0; if(e&0x80) k=0x10; e=(e<<1)&0xFF; f=0; if(!
 cbops[0x24] = [this]()->int{int k=0; if(h&0x80) k=0x10; h=(h<<1)&0xFF; f=0; if(!h) f=0x80; f=(f&0xEF)+k; return 2;}; //SLAr_h
 cbops[0x25] = [this]()->int{int k=0; if(l&0x80) k=0x10; l=(l<<1)&0xFF; f=0; if(!l) f=0x80; f=(f&0xEF)+k; return 2;}; //SLAr_l
 cbops[0x27] = [this]()->int{int k=0; if(a&0x80) k=0x10; a=(a<<1)&0xFF; f=0; if(!a) f=0x80; f=(f&0xEF)+k; return 2;}; //SLAr_a
-//cbops[0x0E] = [this]()->int{int k=0; if(b&0x80) k=0x10; b=(b<<1)&0xFF+1; f=0; if(!b) f=0x80; f=(f&0xEF)+k; return 2;} //SLLr_b
-//cbops[0x0E] = [this]()->int{int k=0; if(c&0x80) k=0x10; c=(c<<1)&0xFF+1; f=0; if(!c) f=0x80; f=(f&0xEF)+k; return 2;} //SLLr_c
-//cbops[0x0E] = [this]()->int{int k=0; if(d&0x80) k=0x10; d=(d<<1)&0xFF+1; f=0; if(!d) f=0x80; f=(f&0xEF)+k; return 2;} //SLLr_d
-//cbops[0x0E] = [this]()->int{int k=0; if(e&0x80) k=0x10; e=(e<<1)&0xFF+1; f=0; if(!e) f=0x80; f=(f&0xEF)+k; return 2;} //SLLr_e
-//cbops[0x0E] = [this]()->int{int k=0; if(h&0x80) k=0x10; h=(h<<1)&0xFF+1; f=0; if(!h) f=0x80; f=(f&0xEF)+k; return 2;} //SLLr_h
-//cbops[0x0E] = [this]()->int{int k=0; if(l&0x80) k=0x10; l=(l<<1)&0xFF+1; f=0; if(!l) f=0x80; f=(f&0xEF)+k; return 2;} //SLLr_l
-//cbops[0x0E] = [this]()->int{int k=0; if(a&0x80) k=0x10; a=(a<<1)&0xFF+1; f=0; if(!a) f=0x80; f=(f&0xEF)+k; return 2;} //SLLr_a
 cbops[0x28] = [this]()->int{int k=b&0x80; int t=0; if(b&0x01) t=0x10; b=((b>>1)+k)&0xFF; f=0; if(!b) f=0x80; f=(f&0xEF)+t; return 2;}; //SRAr_b
 cbops[0x29] = [this]()->int{int k=c&0x80; int t=0; if(c&0x01) t=0x10; c=((c>>1)+k)&0xFF; f=0; if(!c) f=0x80; f=(f&0xEF)+t; return 2;}; //SRAr_c
 cbops[0x2A] = [this]()->int{int k=d&0x80; int t=0; if(d&0x01) t=0x10; d=((d>>1)+k)&0xFF; f=0; if(!d) f=0x80; f=(f&0xEF)+t; return 2;}; //SRAr_d
@@ -502,7 +493,6 @@ cbops[0x3C] = [this]()->int{int k=0; if(h&0x01) k=0x10; h=(h>>1)&0xFF; f=0; if(!
 cbops[0x3D] = [this]()->int{int k=0; if(l&0x01) k=0x10; l=(l>>1)&0xFF; f=0; if(!l) f=0x80; f=(f&0xEF)+k; return 2;}; //SRLr_l
 cbops[0x3F] = [this]()->int{int k=0; if(a&0x01) k=0x10; a=(a>>1)&0xFF; f=0; if(!a) f=0x80; f=(f&0xEF)+k; return 2;}; //SRLr_a
 ops[0x2F] = [this]()->int{a^=0xFF; f=0; if(!a) f=0x80; return 1;}; //CPL
-//ops[0x3F] = [this]{a=-a; f=0; if(a<0) f=0x10; a&=0xFF; if(!a) f|=0x80; return 2;} //NEG
 ops[0x3F] = [this]()->int{int k=0; if(!(f&0x10)) k=0x10; f=(f&0xEF)+k; return 1;}; //CCF
 ops[0x37] = [this]()->int{f|=0x10; return 1;}; //SCF
 ops[0xC5] = [this]()->int{sp--; memory.wb(sp, b); sp--; memory.wb(sp, c); return 3;}; //PUSHBC
@@ -544,11 +534,6 @@ ops[0xE7] = [this]()->int{backup(); sp-=2; memory.ww(sp, pc); pc=0x20; return 3;
 ops[0xEF] = [this]()->int{backup(); sp-=2; memory.ww(sp, pc); pc=0x28; return 3;}; //RST28
 ops[0xF7] = [this]()->int{backup(); sp-=2; memory.ww(sp, pc); pc=0x30; return 3;}; //RST30
 ops[0xFF] = [this]()->int{backup(); sp-=2; memory.ww(sp, pc); pc=0x38; return 3;}; //RST38
-//ops[0xD8] = [this]()->int{backup(); sp-=2; memory.ww(sp, pc); pc=0x40; return 3;} //RST40
-//ops[0xD8] = [this]()->int{backup(); sp-=2; memory.ww(sp, pc); pc=0x48; return 3;} //RST48
-//ops[0xD8] = [this]()->int{backup(); sp-=2; memory.ww(sp, pc); pc=0x50; return 3;} //RST50
-//ops[0xD8] = [this]()->int{backup(); sp-=2; memory.ww(sp, pc); pc=0x58; return 3;} //RST58
-//ops[0xD8] = [this]()->int{backup(); sp-=2; memory.ww(sp, pc); pc=0x60; return 3;} //RST60
 ops[0x00] = [this]()->int{return 1;}; //NOP
 ops[0x76] = [this]()->int{return 1;}; //HALT
 ops[0xF3] = [this]()->int{return 1;}; //DI

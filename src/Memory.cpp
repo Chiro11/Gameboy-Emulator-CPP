@@ -6,7 +6,7 @@ Memory::Memory() {
 }
 
 void Memory::load() {
-    ifstream f("opus5.gb", ios::binary);
+    ifstream f("test\\ttt.gb", ios::binary);
     rom.assign(istreambuf_iterator<char>(f), istreambuf_iterator<char>());
 }
 
@@ -34,7 +34,16 @@ void Memory::init() {
 }
 
 int Memory::rb(int addr) {
-    return rom[addr];
+    if(addr==0xFF00) {
+        int val = rom[0xFF00]&0xF0;
+        switch((val>>4)&3) {
+            case 1: val |= key.getkey(0); break;
+            case 2: val |= key.getkey(1); break;
+        }
+        return val;
+    }
+    else
+        return rom[addr];
 }
 
 void Memory::wb(int addr, int val) {
@@ -46,6 +55,6 @@ int Memory::rw(int addr) {
 }
 
 void Memory::ww(int addr, int val) {
-    wb(addr, val&255);
+    wb(addr, val&0xFF);
     wb(addr+1, val>>8);
 }
