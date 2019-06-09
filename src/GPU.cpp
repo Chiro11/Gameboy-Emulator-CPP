@@ -1,10 +1,11 @@
 #include "GPU.h"
 using namespace std;
 
-const int palette[4] = {0, 96, 192, 255};
+const int palette[4] = {255, 192, 96, 0};
 
 GPU::GPU() {
     clock = 0;
+    memset(curline, 0, sizeof(curline));
     SDL_Init(SDL_INIT_VIDEO);
     window = SDL_CreateWindow("Gameboy", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 160, 144, SDL_WINDOW_SHOWN);
     surface = SDL_GetWindowSurface(window);
@@ -29,6 +30,9 @@ void GPU::step(int time) {
                 if(row==144) {
                     mode = 1;
                     SDL_UpdateWindowSurface(window);
+                    int IF = memory.rb(0xFF0F);
+                    IF |= 0x01;
+                    memory.wb(0xFF0F, IF);
                 }
                 else
                     mode = 2;
@@ -66,32 +70,70 @@ void GPU::step(int time) {
 
 void GPU::randerLine() {
     int row = memory.rb(0xFF44);
-    int y = memory.rb(0xFF42)+row;
-    int x = memory.rb(0xFF43);
-    int lcd_reg = memory.rb(0xFF40);
-    int bgtilemap = (lcd_reg>>3)&1;
-    int bgtileset = (lcd_reg>>4)&1;
-    int addr = y/8*32+x/8;
-    if(bgtilemap)
-        addr += 0x9C00;
-    else
-        addr += 0x9800;
-    if(lcd_reg&0x01) {
+    int lcdc = memory.rb(0xFF40);
+    if(lcdc&0x01) {
+        int bgy = memory.rb(0xFF42)+row;
+        int bgx = memory.rb(0xFF43);
+        int bgtilemap = (lcdc>>3)&1;
+        int bgtileset = (lcdc>>4)&1;
+        int addr = bgy/8*32+bgx/8;
+        if(bgtilemap)
+            addr += 0x9C00;
+        else
+            addr += 0x9800;
         for(int col=0; col<160; col++) {
             int tile_id = memory.rb(addr);
             if(!bgtileset)
                 tile_id += 256;
-            int tile_y = y%8;
-            int tile_x = x%8;
+            int tile_y = bgy%8;
+            int tile_x = bgx%8;
             int pos = 0x8000+tile_id*16+tile_y*2;
             int u = memory.rb(pos);
             int v = memory.rb(pos+1);
-            int color = palette[((u>>(7-tile_x))&1)|(((v>>(7-tile_x))&1)<<1)];
+            int val = ((u>>(7-tile_x))&1)|(((v>>(7-tile_x))&1)<<1);
+            curline[col] = val;
+            int color = palette[val];
             Uint32* pixels = (Uint32*)surface->pixels;
             pixels[row*160+col] = SDL_MapRGB(surface->format, color, color, color);
-            x++;
-            if(x%8==0)
+            bgx++;
+            if(bgx%8==0)
                 addr++;
+        }
+    }
+    if(lcdc&0x02) {
+        for(int i=0; i<40; i++) {
+            int addr = 0xFE00+i*4;
+            int objy = memory.rb(addr)-16;
+            if(row<objy || row>=objy+8)
+                continue;
+            int objx = memory.rb(addr+1)-8;
+            int tile_id = memory.rb(addr+2);
+            int objinfo = memory.rb(addr+3);
+            for(int col=objx; col<objx+8; col++) {
+                if(col<0 || col>=160)
+                    continue;
+                if(curline[col] && (objinfo&0x80))
+                    continue;
+                int tile_y;
+                if(objinfo&0x40)
+                    tile_y = 7-(row-objy);
+                else
+                    tile_y = row-objy;
+                int tile_x;
+                if(objinfo&0x20)
+                    tile_x = 7-(col-objx);
+                else
+                    tile_x = col-objx;
+                int pos = 0x8000+tile_id*16+tile_y*2;
+                int u = memory.rb(pos);
+                int v = memory.rb(pos+1);
+                int val = ((u>>(7-tile_x))&1)|(((v>>(7-tile_x))&1)<<1);
+                if(!val)
+                    continue;
+                int color = palette[val];
+                Uint32* pixels = (Uint32*)surface->pixels;
+                pixels[row*160+col] = SDL_MapRGB(surface->format, color, color, color);
+            }
         }
     }
 }

@@ -6,7 +6,7 @@ Memory::Memory() {
 }
 
 void Memory::load() {
-    ifstream f("test\\ttt.gb", ios::binary);
+    ifstream f("test\\tank.gb", ios::binary);
     rom.assign(istreambuf_iterator<char>(f), istreambuf_iterator<char>());
 }
 

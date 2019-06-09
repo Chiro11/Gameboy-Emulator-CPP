@@ -2,47 +2,48 @@
 using namespace std;
 
 CPU::CPU() {
+    fp = fopen("log.txt", "w");
     a=0x01, b=0x00, c=0x13, d=0x00, e=0xD8, h=0x01, l=0x4D, f=0xB0;
     sp=0xFFFE, pc=0x0100;
+    ime = 1, halt = 0;
     opload();
 }
 
-void CPU::backup() {
-    reg_backup[0]=a;
-    reg_backup[1]=b;
-    reg_backup[2]=c;
-    reg_backup[3]=d;
-    reg_backup[4]=e;
-    reg_backup[5]=h;
-    reg_backup[6]=l;
-    reg_backup[7]=f;
-    reg_backup[8]=sp;
-    reg_backup[9]=pc;
-}
-
-void CPU::restore() {
-    a=reg_backup[0];
-    b=reg_backup[1];
-    c=reg_backup[2];
-    d=reg_backup[3];
-    e=reg_backup[4];
-    f=reg_backup[5];
-    h=reg_backup[6];
-    l=reg_backup[7];
-    sp=reg_backup[8];
-    pc=reg_backup[9];
-}
-
 int CPU::step() {
-    return ops[memory.rb(pc++)]();
+    int ret = 0;
+    int IE = memory.rb(0xFFFF);
+    int IF = memory.rb(0xFF0F);
+    if(halt)
+        ret = 1;
+    else {
+        int k = memory.rb(pc++);
+        pc &= 0xFFFF;
+        ret = ops[k]();
+    }
+    if(ime && IE && IF) {
+        halt = 0;
+        int tmp = IE&IF;
+        for(int i=0; i<5; i++) {
+            if(tmp&(1<<i)) {
+                ime = 0;
+                tmp -= (1<<i);
+                sp -= 2;
+                memory.ww(sp, pc);
+                pc = 0x40+i*0x08;
+                ret = 3;
+                break;
+            }
+        }
+    }
+    return ret;
 }
 
-//关于f的0x80位
-//忽略的指令 总数是否符合
-//关于正负号的问题
-//关于&0x01
-//关于ime
+//LDmmSP
 void CPU::opload() {
+for(int i=0; i<256; i++) {
+    ops[i] = [this]()->int{return 1;};
+    cbops[i] = [this]()->int{return 1;};
+}
 ops[0x40] = [this]()->int{b=b; return 1;}; //LDrr_bb
 ops[0x41] = [this]()->int{b=c; return 1;}; //LDrr_bc
 ops[0x42] = [this]()->int{b=d; return 1;}; //LDrr_bd
@@ -98,7 +99,7 @@ ops[0x56] = [this]()->int{d=memory.rb((h<<8)+l); return 2;}; //LDrHLm_d
 ops[0x5E] = [this]()->int{e=memory.rb((h<<8)+l); return 2;}; //LDrHLm_e
 ops[0x66] = [this]()->int{h=memory.rb((h<<8)+l); return 2;}; //LDrHLm_h
 ops[0x6E] = [this]()->int{l=memory.rb((h<<8)+l); return 2;}; //LDrHLm_l
-ops[0x7E] = [this]()->int{b=memory.rb((h<<8)+l); return 2;}; //LDrHLm_a
+ops[0x7E] = [this]()->int{a=memory.rb((h<<8)+l); return 2;}; //LDrHLm_a
 ops[0x70] = [this]()->int{memory.wb((h<<8)+l, b); return 2;}; //LDHLmr_b
 ops[0x71] = [this]()->int{memory.wb((h<<8)+l, c); return 2;}; //LDHLmr_c
 ops[0x72] = [this]()->int{memory.wb((h<<8)+l, d); return 2;}; //LDHLmr_d
@@ -124,7 +125,7 @@ ops[0x01] = [this]()->int{c=memory.rb(pc); b=memory.rb(pc+1); pc+=2; return 3;};
 ops[0x11] = [this]()->int{e=memory.rb(pc); d=memory.rb(pc+1); pc+=2; return 3;}; //LDDEnn
 ops[0x21] = [this]()->int{l=memory.rb(pc); h=memory.rb(pc+1); pc+=2; return 3;}; //LDHLnn
 ops[0x31] = [this]()->int{sp=memory.rw(pc); pc+=2; return 3;}; //LDSPnn
-ops[0x36] = [this]()->int{int k=memory.rw(pc); l=memory.rb(k); h=memory.rb(k+1); pc+=2; return 5;}; //LDHLmm
+ops[0x08] = [this]()->int{memory.ww(memory.rw(pc), sp); pc+=2; return 5;}; //LDmmSP
 ops[0x22] = [this]()->int{memory.wb((h<<8)+l, a); l=(l+1)&0xFF; if(!l) h=(h+1)&0xFF; return 2;}; //LDHLIA
 ops[0x2A] = [this]()->int{a=memory.rb((h<<8)+l); l=(l+1)&0xFF; if(!l) h=(h+1)&0xFF; return 2;}; //LDAHLI
 ops[0x32] = [this]()->int{memory.wb((h<<8)+l, a); l=(l-1)&0xFF; if(l==0xFF) h=(h-1)&0xFF; return 2;}; //LDHLDA
@@ -133,14 +134,14 @@ ops[0xF0] = [this]()->int{a=memory.rb(0xFF00+memory.rb(pc++)); return 3;}; //LDA
 ops[0xE0] = [this]()->int{memory.wb(0xFF00+memory.rb(pc++), a); return 3;}; //LDIOnA
 ops[0xF2] = [this]()->int{a=memory.rb(0xFF00+c); return 2;}; //LDAIOC
 ops[0xE2] = [this]()->int{memory.wb(0xFF00+c, a); return 2;}; //LDIOCA
-ops[0xF8] = [this]()->int{int k=memory.rb(pc); if(k>0x7F) k=-((~k+1)&0xFF); pc++; k+=sp; h=(k>>8)&0xFF; l=k&0xFF; return 3;}; //LDHLSPn
-cbops[0x30] = [this]()->int{int k=b; b=((k&0xF)<<4)|((k&0xF0)>>4); f=0; if(!b) f=0x80; return 1;}; //SWAPr_b
-cbops[0x31] = [this]()->int{int k=c; c=((k&0xF)<<4)|((k&0xF0)>>4); f=0; if(!c) f=0x80; return 1;}; //SWAPr_c
-cbops[0x32] = [this]()->int{int k=d; d=((k&0xF)<<4)|((k&0xF0)>>4); f=0; if(!d) f=0x80; return 1;}; //SWAPr_d
-cbops[0x33] = [this]()->int{int k=e; e=((k&0xF)<<4)|((k&0xF0)>>4); f=0; if(!e) f=0x80; return 1;}; //SWAPr_e
-cbops[0x34] = [this]()->int{int k=h; h=((k&0xF)<<4)|((k&0xF0)>>4); f=0; if(!h) f=0x80; return 1;}; //SWAPr_h
-cbops[0x35] = [this]()->int{int k=l; l=((k&0xF)<<4)|((k&0xF0)>>4); f=0; if(!l) f=0x80; return 1;}; //SWAPr_l
-cbops[0x37] = [this]()->int{int k=a; a=((k&0xF)<<4)|((k&0xF0)>>4); f=0; if(!a) f=0x80; return 1;}; //SWAPr_a
+ops[0xF8] = [this]()->int{int k=memory.rb(pc++); if(k>0x7F) k=-((~k+1)&0xFF); k+=sp; h=(k>>8)&0xFF; l=k&0xFF; return 3;}; //LDHLSPn
+cbops[0x30] = [this]()->int{int k=b; b=((k&0xF)<<4)|((k&0xF0)>>4); f=0; if(!b) f|=0x80; return 1;}; //SWAPr_b
+cbops[0x31] = [this]()->int{int k=c; c=((k&0xF)<<4)|((k&0xF0)>>4); f=0; if(!c) f|=0x80; return 1;}; //SWAPr_c
+cbops[0x32] = [this]()->int{int k=d; d=((k&0xF)<<4)|((k&0xF0)>>4); f=0; if(!d) f|=0x80; return 1;}; //SWAPr_d
+cbops[0x33] = [this]()->int{int k=e; e=((k&0xF)<<4)|((k&0xF0)>>4); f=0; if(!e) f|=0x80; return 1;}; //SWAPr_e
+cbops[0x34] = [this]()->int{int k=h; h=((k&0xF)<<4)|((k&0xF0)>>4); f=0; if(!h) f|=0x80; return 1;}; //SWAPr_h
+cbops[0x35] = [this]()->int{int k=l; l=((k&0xF)<<4)|((k&0xF0)>>4); f=0; if(!l) f|=0x80; return 1;}; //SWAPr_l
+cbops[0x37] = [this]()->int{int k=a; a=((k&0xF)<<4)|((k&0xF0)>>4); f=0; if(!a) f|=0x80; return 1;}; //SWAPr_a
 ops[0x80] = [this]()->int{int k=a; a+=b; f=0; if(a>0xFF) f=0x10; a&=0xFF; if(!a) f|=0x80; if((a^b^k)&0x10) f|=0x20; return 1;}; //ADDr_b
 ops[0x81] = [this]()->int{int k=a; a+=c; f=0; if(a>0xFF) f=0x10; a&=0xFF; if(!a) f|=0x80; if((a^c^k)&0x10) f|=0x20; return 1;}; //ADDr_c
 ops[0x82] = [this]()->int{int k=a; a+=d; f=0; if(a>0xFF) f=0x10; a&=0xFF; if(!a) f|=0x80; if((a^d^k)&0x10) f|=0x20; return 1;}; //ADDr_d
@@ -191,7 +192,7 @@ ops[0xBD] = [this]()->int{int k=a-l; f=0x40; if(k<0) f=0x50; k&=0xFF; if(!k) f|=
 ops[0xBF] = [this]()->int{int k=a-a; f=0x40; if(k<0) f=0x50; k&=0xFF; if(!k) f|=0x80; if((a^a^k)&0x10) f|=0x20; return 1;}; //CPr_a
 ops[0xBE] = [this]()->int{int k=a; int t=memory.rb((h<<8)+l); k-=t; f=0x40; if(k<0) f=0x50; k&=0xFF; if(!k) f|=0x80; if((a^k^t)&0x10) f|=0x20; return 2;}; //CPHL
 ops[0xFE] = [this]()->int{int k=a; int t=memory.rb(pc++); k-=t; f=0x40; if(k<0) f=0x50; k&=0xFF; if(!k) f|=0x80; if((a^k^t)&0x10) f|=0x20; return 2;}; //CPn
-ops[0x27] = [this]()->int{int k=a; if((f&0x20)||((a&0xF)>9)) a+=6; f&=0xEF; if((f&0x20)||(k>0x99)) {a+=0x60; f|=0x10;} return 1;}; //DAA
+ops[0x27] = [this]()->int{int k=a; if((f&0x20)||((a&0x0F)>9)) a+=6; f&=0xEF; if((f&0x20)||(k>0x99)) {a+=0x60; f|=0x10;} return 1;}; //DAA
 ops[0xA0] = [this]()->int{a&=b; a&=0xFF; f=0; if(!a) f=0x80; return 1;}; //ANDr_b
 ops[0xA1] = [this]()->int{a&=c; a&=0xFF; f=0; if(!a) f=0x80; return 1;}; //ANDr_c
 ops[0xA2] = [this]()->int{a&=d; a&=0xFF; f=0; if(!a) f=0x80; return 1;}; //ANDr_d
@@ -219,30 +220,30 @@ ops[0xAD] = [this]()->int{a^=l; a&=0xFF; f=0; if(!a) f=0x80; return 1;}; //XORr_
 ops[0xAF] = [this]()->int{a^=a; a&=0xFF; f=0; if(!a) f=0x80; return 1;}; //XORr_a
 ops[0xAE] = [this]()->int{a^=memory.rb((h<<8)+l); a&=0xFF; f=0; if(!a) f=0x80; return 2;}; //XORHL
 ops[0xEE] = [this]()->int{a^=memory.rb(pc++); a&=0xFF; f=0; if(!a) f=0x80; return 2;}; //XORn
-ops[0x04] = [this]()->int{b++; b&=0xFF; f=0; if(!b) f=0x80; return 1;}; //INCr_b
-ops[0x0C] = [this]()->int{c++; c&=0xFF; f=0; if(!c) f=0x80; return 1;}; //INCr_c
-ops[0x14] = [this]()->int{d++; d&=0xFF; f=0; if(!d) f=0x80; return 1;}; //INCr_d
-ops[0x1C] = [this]()->int{e++; e&=0xFF; f=0; if(!e) f=0x80; return 1;}; //INCr_e
-ops[0x24] = [this]()->int{h++; h&=0xFF; f=0; if(!h) f=0x80; return 1;}; //INCr_h
-ops[0x2C] = [this]()->int{l++; l&=0xFF; f=0; if(!l) f=0x80; return 1;}; //INCr_l
-ops[0x3C] = [this]()->int{a++; a&=0xFF; f=0; if(!a) f=0x80; return 1;}; //INCr_a
-ops[0x34] = [this]()->int{int k=memory.rb((h<<8)+l)+1; k&=0xFF; memory.wb((h<<8)+l, k); f=0; if(!k) f=0x80; return 3;}; //INCHLm
-ops[0x05] = [this]()->int{b--; b&=0xFF; f=0; if(!b) f=0x80; return 1;}; //DECr_b
-ops[0x0D] = [this]()->int{c--; c&=0xFF; f=0; if(!c) f=0x80; return 1;}; //DECr_c
-ops[0x15] = [this]()->int{d--; d&=0xFF; f=0; if(!d) f=0x80; return 1;}; //DECr_d
-ops[0x1D] = [this]()->int{e--; e&=0xFF; f=0; if(!e) f=0x80; return 1;}; //DECr_e
-ops[0x25] = [this]()->int{h--; h&=0xFF; f=0; if(!h) f=0x80; return 1;}; //DECr_h
-ops[0x2D] = [this]()->int{l--; l&=0xFF; f=0; if(!l) f=0x80; return 1;}; //DECr_l
-ops[0x3D] = [this]()->int{a--; a&=0xFF; f=0; if(!a) f=0x80; return 1;}; //DECr_a
-ops[0x35] = [this]()->int{int k=memory.rb((h<<8)+l)-1; k&=0xFF; memory.wb((h<<8)+l, k); f=0; if(!k) f=0x80; return 3;}; //DECHLm
+ops[0x04] = [this]()->int{b=(b+1)&0xFF; f=0; if(!b) f=0x80; return 1;}; //INCr_b
+ops[0x0C] = [this]()->int{c=(c+1)&0xFF; f=0; if(!c) f=0x80; return 1;}; //INCr_c
+ops[0x14] = [this]()->int{d=(d+1)&0xFF; f=0; if(!d) f=0x80; return 1;}; //INCr_d
+ops[0x1C] = [this]()->int{e=(e+1)&0xFF; f=0; if(!e) f=0x80; return 1;}; //INCr_e
+ops[0x24] = [this]()->int{h=(h+1)&0xFF; f=0; if(!h) f=0x80; return 1;}; //INCr_h
+ops[0x2C] = [this]()->int{l=(l+1)&0xFF; f=0; if(!l) f=0x80; return 1;}; //INCr_l
+ops[0x3C] = [this]()->int{a=(a+1)&0xFF; f=0; if(!a) f=0x80; return 1;}; //INCr_a
+ops[0x34] = [this]()->int{int k=memory.rb((h<<8)+l); k=(k+1)&0xFF; memory.wb((h<<8)+l, k); f=0; if(!k) f=0x80; return 3;}; //INCHLm
+ops[0x05] = [this]()->int{b=(b-1)&0xFF; f=0; if(!b) f=0x80; return 1;}; //DECr_b
+ops[0x0D] = [this]()->int{c=(c-1)&0xFF; f=0; if(!c) f=0x80; return 1;}; //DECr_c
+ops[0x15] = [this]()->int{d=(d-1)&0xFF; f=0; if(!d) f=0x80; return 1;}; //DECr_d
+ops[0x1D] = [this]()->int{e=(e-1)&0xFF; f=0; if(!e) f=0x80; return 1;}; //DECr_e
+ops[0x25] = [this]()->int{h=(h-1)&0xFF; f=0; if(!h) f=0x80; return 1;}; //DECr_h
+ops[0x2D] = [this]()->int{l=(l-1)&0xFF; f=0; if(!l) f=0x80; return 1;}; //DECr_l
+ops[0x3D] = [this]()->int{a=(a-1)&0xFF; f=0; if(!a) f=0x80; return 1;}; //DECr_a
+ops[0x35] = [this]()->int{int k=memory.rb((h<<8)+l); k=(k-1)&0xFF; memory.wb((h<<8)+l, k); f=0; if(!k) f=0x80; return 3;}; //DECHLm
 ops[0x03] = [this]()->int{c=(c+1)&0xFF; if(!c) b=(b+1)&0xFF; return 1;}; //INCBC
 ops[0x13] = [this]()->int{e=(e+1)&0xFF; if(!e) d=(d+1)&0xFF; return 1;}; //INCDE
 ops[0x23] = [this]()->int{l=(l+1)&0xFF; if(!l) h=(h+1)&0xFF; return 1;}; //INCHL
-ops[0x33] = [this]()->int{sp=(sp+1)&0xFF; return 1;}; //INCSP
+ops[0x33] = [this]()->int{sp=(sp+1)&0xFFFF; return 1;}; //INCSP
 ops[0x0B] = [this]()->int{c=(c-1)&0xFF; if(c==0xFF) b=(b-1)&0xFF; return 1;}; //DECBC
 ops[0x1B] = [this]()->int{e=(e-1)&0xFF; if(e==0xFF) d=(d-1)&0xFF; return 1;}; //DECDE
 ops[0x2B] = [this]()->int{l=(l-1)&0xFF; if(l==0xFF) h=(h-1)&0xFF; return 1;}; //DECHL
-ops[0x3B] = [this]()->int{sp=(sp-1)&0xFF; return 1;}; //DECSP
+ops[0x3B] = [this]()->int{sp=(sp-1)&0xFFFF; return 1;}; //DECSP
 cbops[0x40] = [this]()->int{f&=0x1F; f|=0x20; if(!(b&0x01)) f|=0x80; return 2;}; //BIT0b
 cbops[0x41] = [this]()->int{f&=0x1F; f|=0x20; if(!(c&0x01)) f|=0x80; return 2;}; //BIT0c
 cbops[0x42] = [this]()->int{f&=0x1F; f|=0x20; if(!(d&0x01)) f|=0x80; return 2;}; //BIT0d
@@ -448,12 +449,12 @@ cbops[0x15] = [this]()->int{int k=0; if(f&0x10) k=1; int t=0; if(l&0x80) t=0x10;
 cbops[0x17] = [this]()->int{int k=0; if(f&0x10) k=1; int t=0; if(a&0x80) t=0x10; a=(a<<1)+k; a&=0xFF; f=0; if(!a) f=0x80; f=(f&0xEF)+t; return 2;}; //RLr_a
 cbops[0x16] = [this]()->int{int k=memory.rb((h<<8)+l); int t=0; if(f&0x10) t=1; int u=0; if(k&0x80) u=0x10; k=(k<<1)+t; k&=0xFF; f=0; if(!k) f=0x80; memory.wb((h<<8)+l, k); f=(f&0xEF)+u; return 4;}; //RLHL
 cbops[0x00] = [this]()->int{int k=0; if(b&0x80) k=1; int t=0; if(b&0x80) t=0x10; b=(b<<1)+k; b&=0xFF; f=0; if(!b) f=0x80; f=(f&0xEF)+t; return 2;}; //RLCr_b
-cbops[0x01] = [this]()->int{int k=0; if(c&0x10) k=1; int t=0; if(c&0x80) t=0x10; c=(c<<1)+k; c&=0xFF; f=0; if(!c) f=0x80; f=(f&0xEF)+t; return 2;}; //RLCr_c
-cbops[0x02] = [this]()->int{int k=0; if(d&0x10) k=1; int t=0; if(d&0x80) t=0x10; d=(d<<1)+k; d&=0xFF; f=0; if(!d) f=0x80; f=(f&0xEF)+t; return 2;}; //RLCr_d
-cbops[0x03] = [this]()->int{int k=0; if(e&0x10) k=1; int t=0; if(e&0x80) t=0x10; e=(e<<1)+k; e&=0xFF; f=0; if(!e) f=0x80; f=(f&0xEF)+t; return 2;}; //RLCr_e
-cbops[0x04] = [this]()->int{int k=0; if(h&0x10) k=1; int t=0; if(h&0x80) t=0x10; h=(h<<1)+k; h&=0xFF; f=0; if(!h) f=0x80; f=(f&0xEF)+t; return 2;}; //RLCr_h
-cbops[0x05] = [this]()->int{int k=0; if(l&0x10) k=1; int t=0; if(l&0x80) t=0x10; l=(l<<1)+k; l&=0xFF; f=0; if(!l) f=0x80; f=(f&0xEF)+t; return 2;}; //RLCr_l
-cbops[0x07] = [this]()->int{int k=0; if(a&0x10) k=1; int t=0; if(a&0x80) t=0x10; a=(a<<1)+k; a&=0xFF; f=0; if(!a) f=0x80; f=(f&0xEF)+t; return 2;}; //RLCr_a
+cbops[0x01] = [this]()->int{int k=0; if(c&0x80) k=1; int t=0; if(c&0x80) t=0x10; c=(c<<1)+k; c&=0xFF; f=0; if(!c) f=0x80; f=(f&0xEF)+t; return 2;}; //RLCr_c
+cbops[0x02] = [this]()->int{int k=0; if(d&0x80) k=1; int t=0; if(d&0x80) t=0x10; d=(d<<1)+k; d&=0xFF; f=0; if(!d) f=0x80; f=(f&0xEF)+t; return 2;}; //RLCr_d
+cbops[0x03] = [this]()->int{int k=0; if(e&0x80) k=1; int t=0; if(e&0x80) t=0x10; e=(e<<1)+k; e&=0xFF; f=0; if(!e) f=0x80; f=(f&0xEF)+t; return 2;}; //RLCr_e
+cbops[0x04] = [this]()->int{int k=0; if(h&0x80) k=1; int t=0; if(h&0x80) t=0x10; h=(h<<1)+k; h&=0xFF; f=0; if(!h) f=0x80; f=(f&0xEF)+t; return 2;}; //RLCr_h
+cbops[0x05] = [this]()->int{int k=0; if(l&0x80) k=1; int t=0; if(l&0x80) t=0x10; l=(l<<1)+k; l&=0xFF; f=0; if(!l) f=0x80; f=(f&0xEF)+t; return 2;}; //RLCr_l
+cbops[0x07] = [this]()->int{int k=0; if(a&0x80) k=1; int t=0; if(a&0x80) t=0x10; a=(a<<1)+k; a&=0xFF; f=0; if(!a) f=0x80; f=(f&0xEF)+t; return 2;}; //RLCr_a
 cbops[0x06] = [this]()->int{int k=memory.rb((h<<8)+l); int t=0; if(k&0x80) t=1; int u=0; if(k&0x80) u=0x10; k=(k<<1)+t; k&=0xFF; f=0; if(!k) f=0x80; memory.wb((h<<8)+l, k); f=(f&0xEF)+u; return 4;}; //RLCHL
 cbops[0x18] = [this]()->int{int k=0; if(f&0x10) k=0x80; int t=0; if(b&0x01) t=0x10; b=(b>>1)+k; b&=0xFF; f=0; if(!b) f=0x80; f=(f&0xEF)+t; return 2;}; //RRr_b
 cbops[0x19] = [this]()->int{int k=0; if(f&0x10) k=0x80; int t=0; if(c&0x01) t=0x10; c=(c>>1)+k; c&=0xFF; f=0; if(!c) f=0x80; f=(f&0xEF)+t; return 2;}; //RRr_c
@@ -509,34 +510,34 @@ ops[0xC2] = [this]()->int{if((f&0x80)==0x00) {pc=memory.rw(pc); return 4;} else 
 ops[0xCA] = [this]()->int{if((f&0x80)==0x80) {pc=memory.rw(pc); return 4;} else {pc+=2; return 3;}}; //JPZnn
 ops[0xD2] = [this]()->int{if((f&0x10)==0x00) {pc=memory.rw(pc); return 4;} else {pc+=2; return 3;}}; //JPNCnn
 ops[0xDA] = [this]()->int{if((f&0x10)==0x10) {pc=memory.rw(pc); return 4;} else {pc+=2; return 3;}}; //JPCnn
-ops[0x18] = [this]()->int{int k=memory.rb(pc); if(k>0x7F) k=-((~k+1)&0xFF); pc+=k+1; return 3;}; //JRn
-ops[0x20] = [this]()->int{int k=memory.rb(pc); if(k>0x7F) k=-((~k+1)&0xFF); pc++; int ret=2; if((f&0x80)==0x00) {pc+=k; ret++;} return ret;}; //JRNZn
-ops[0x28] = [this]()->int{int k=memory.rb(pc); if(k>0x7F) k=-((~k+1)&0xFF); pc++; int ret=2; if((f&0x80)==0x80) {pc+=k; ret++;} return ret;}; //JRZn
-ops[0x30] = [this]()->int{int k=memory.rb(pc); if(k>0x7F) k=-((~k+1)&0xFF); pc++; int ret=2; if((f&0x10)==0x00) {pc+=k; ret++;} return ret;}; //JRNCn
-ops[0x38] = [this]()->int{int k=memory.rb(pc); if(k>0x7F) k=-((~k+1)&0xFF); pc++; int ret=2; if((f&0x10)==0x10) {pc+=k; ret++;} return ret;}; //JRCn
-ops[0x10] = [this]()->int{int k=memory.rb(pc); if(k>0x7F) k=-((~k+1)&0xFF); pc++; int ret=2; b--; if(b) {pc+=k; ret++;} return ret;}; //DJNZn
+ops[0x18] = [this]()->int{int k=memory.rb(pc++); if(k>0x7F) k=-((~k+1)&0xFF); pc+=k; return 3;}; //JRn
+ops[0x20] = [this]()->int{int k=memory.rb(pc++); if(k>0x7F) k=-((~k+1)&0xFF); int ret=2; if((f&0x80)==0x00) {pc+=k; ret++;} return ret;}; //JRNZn
+ops[0x28] = [this]()->int{int k=memory.rb(pc++); if(k>0x7F) k=-((~k+1)&0xFF); int ret=2; if((f&0x80)==0x80) {pc+=k; ret++;} return ret;}; //JRZn
+ops[0x30] = [this]()->int{int k=memory.rb(pc++); if(k>0x7F) k=-((~k+1)&0xFF); int ret=2; if((f&0x10)==0x00) {pc+=k; ret++;} return ret;}; //JRNCn
+ops[0x38] = [this]()->int{int k=memory.rb(pc++); if(k>0x7F) k=-((~k+1)&0xFF); int ret=2; if((f&0x10)==0x10) {pc+=k; ret++;} return ret;}; //JRCn
+ops[0x10] = [this]()->int{int k=memory.rb(pc++); if(k>0x7F) k=-((~k+1)&0xFF); int ret=2; b--; if(b) {pc+=k; ret++;} return ret;}; //DJNZn
 ops[0xCD] = [this]()->int{sp-=2; memory.ww(sp, pc+2); pc=memory.rw(pc); return 5;}; //CALLnn
 ops[0xC4] = [this]()->int{int ret=3; if((f&0x80)==0x00) {sp-=2; memory.ww(sp, pc+2); pc=memory.rw(pc); ret+=2;} else pc+=2; return ret;}; //CALLNZnn
 ops[0xCC] = [this]()->int{int ret=3; if((f&0x80)==0x80) {sp-=2; memory.ww(sp, pc+2); pc=memory.rw(pc); ret+=2;} else pc+=2; return ret;}; //CALLZnn
 ops[0xD4] = [this]()->int{int ret=3; if((f&0x10)==0x00) {sp-=2; memory.ww(sp, pc+2); pc=memory.rw(pc); ret+=2;} else pc+=2; return ret;}; //CALLNCnn
-ops[0xDB] = [this]()->int{int ret=3; if((f&0x10)==0x10) {sp-=2; memory.ww(sp, pc+2); pc=memory.rw(pc); ret+=2;} else pc+=2; return ret;}; //CALLCnn
+ops[0xDC] = [this]()->int{int ret=3; if((f&0x10)==0x10) {sp-=2; memory.ww(sp, pc+2); pc=memory.rw(pc); ret+=2;} else pc+=2; return ret;}; //CALLCnn
 ops[0xC9] = [this]()->int{pc=memory.rw(sp); sp+=2; return 3;}; //RET
-ops[0xD9] = [this]()->int{restore(); pc=memory.rw(sp); sp+=2; return 3;}; //RETI
+ops[0xD9] = [this]()->int{ime=1; pc=memory.rw(sp); sp+=2; return 3;}; //RETI
 ops[0xC0] = [this]()->int{int ret=1; if((f&0x80)==0x00) {pc=memory.rw(sp); sp+=2; ret+=2;} return ret;}; //RETNZ
 ops[0xC8] = [this]()->int{int ret=1; if((f&0x80)==0x80) {pc=memory.rw(sp); sp+=2; ret+=2;} return ret;}; //RETZ
 ops[0xD0] = [this]()->int{int ret=1; if((f&0x10)==0x00) {pc=memory.rw(sp); sp+=2; ret+=2;} return ret;}; //RETNC
 ops[0xD8] = [this]()->int{int ret=1; if((f&0x10)==0x10) {pc=memory.rw(sp); sp+=2; ret+=2;} return ret;}; //RETC
-ops[0xC7] = [this]()->int{backup(); sp-=2; memory.ww(sp, pc); pc=0x00; return 3;}; //RST00
-ops[0xCF] = [this]()->int{backup(); sp-=2; memory.ww(sp, pc); pc=0x08; return 3;}; //RST08
-ops[0xD7] = [this]()->int{backup(); sp-=2; memory.ww(sp, pc); pc=0x10; return 3;}; //RST10
-ops[0xDF] = [this]()->int{backup(); sp-=2; memory.ww(sp, pc); pc=0x18; return 3;}; //RST18
-ops[0xE7] = [this]()->int{backup(); sp-=2; memory.ww(sp, pc); pc=0x20; return 3;}; //RST20
-ops[0xEF] = [this]()->int{backup(); sp-=2; memory.ww(sp, pc); pc=0x28; return 3;}; //RST28
-ops[0xF7] = [this]()->int{backup(); sp-=2; memory.ww(sp, pc); pc=0x30; return 3;}; //RST30
-ops[0xFF] = [this]()->int{backup(); sp-=2; memory.ww(sp, pc); pc=0x38; return 3;}; //RST38
+ops[0xC7] = [this]()->int{sp-=2; memory.ww(sp, pc); pc=0x00; return 3;}; //RST00
+ops[0xCF] = [this]()->int{sp-=2; memory.ww(sp, pc); pc=0x08; return 3;}; //RST08
+ops[0xD7] = [this]()->int{sp-=2; memory.ww(sp, pc); pc=0x10; return 3;}; //RST10
+ops[0xDF] = [this]()->int{sp-=2; memory.ww(sp, pc); pc=0x18; return 3;}; //RST18
+ops[0xE7] = [this]()->int{sp-=2; memory.ww(sp, pc); pc=0x20; return 3;}; //RST20
+ops[0xEF] = [this]()->int{sp-=2; memory.ww(sp, pc); pc=0x28; return 3;}; //RST28
+ops[0xF7] = [this]()->int{sp-=2; memory.ww(sp, pc); pc=0x30; return 3;}; //RST30
+ops[0xFF] = [this]()->int{sp-=2; memory.ww(sp, pc); pc=0x38; return 3;}; //RST38
 ops[0x00] = [this]()->int{return 1;}; //NOP
-ops[0x76] = [this]()->int{return 1;}; //HALT
-ops[0xF3] = [this]()->int{return 1;}; //DI
-ops[0xFB] = [this]()->int{return 1;}; //EI
-ops[0xCB] = [this]()->int{return cbops[memory.rb(pc++)]();}; //MAPcb
+ops[0x76] = [this]()->int{halt=1; return 1;}; //HALT
+ops[0xF3] = [this]()->int{ime=0; return 1;}; //DI
+ops[0xFB] = [this]()->int{ime=1; return 1;}; //EI
+ops[0xCB] = [this]()->int{int k=memory.rb(pc++); pc&=0xFFFF; return cbops[k]();}; //MAPcb
 }

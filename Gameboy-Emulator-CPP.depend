@@ -1,21 +1,22 @@
 # depslib dependency file v1.0
-1559618227 source:c:\users\ntl\documents\c++ project\gameboy-emulator-cpp\src\main.cpp
+1559803420 source:c:\users\ntl\documents\c++ project\gameboy-emulator-cpp\src\main.cpp
+	<time.h>
 	"CPU.h"
 	"Memory.h"
 	"GPU.h"
 	"Key.h"
 
-1559618183 source:c:\users\ntl\documents\c++ project\gameboy-emulator-cpp\src\cpu.cpp
+1559995950 source:c:\users\ntl\documents\c++ project\gameboy-emulator-cpp\src\cpu.cpp
 	"CPU.h"
 
-1559618937 source:c:\users\ntl\documents\c++ project\gameboy-emulator-cpp\src\key.cpp
+1559802677 source:c:\users\ntl\documents\c++ project\gameboy-emulator-cpp\src\key.cpp
 	"Key.h"
 
 1559618745 c:\users\ntl\documents\c++ project\gameboy-emulator-cpp\src\key.h
 	<cstdio>
 	<SDL.h>
 
-1559550015 c:\users\ntl\documents\c++ project\gameboy-emulator-cpp\src\cpu.h
+1559995931 c:\users\ntl\documents\c++ project\gameboy-emulator-cpp\src\cpu.h
 	<functional>
 	"Memory.h"
 
@@ -26,14 +27,14 @@
 	<fstream>
 	"Key.h"
 
-1559573862 c:\users\ntl\documents\c++ project\gameboy-emulator-cpp\src\gpu.h
+1560060272 c:\users\ntl\documents\c++ project\gameboy-emulator-cpp\src\gpu.h
 	<cstring>
 	<SDL.h>
 	"Memory.h"
 
-1559270524 source:c:\users\ntl\documents\c++ project\gameboy-emulator-cpp\src\memory.cpp
+1559996387 source:c:\users\ntl\documents\c++ project\gameboy-emulator-cpp\src\memory.cpp
 	"Memory.h"
 
-1559573859 source:c:\users\ntl\documents\c++ project\gameboy-emulator-cpp\src\gpu.cpp
+1559969464 source:c:\users\ntl\documents\c++ project\gameboy-emulator-cpp\src\gpu.cpp
 	"GPU.h"
 

@@ -1,3 +1,4 @@
+#include <time.h>
 #include "CPU.h"
 #include "Memory.h"
 #include "GPU.h"

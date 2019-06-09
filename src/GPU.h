@@ -11,6 +11,7 @@ private:
     SDL_Window* window;
     SDL_Surface* surface;
     int clock;
+    int curline[160];
 public:
     GPU();
     void quit();

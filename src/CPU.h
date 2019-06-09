@@ -7,14 +7,13 @@ extern Memory memory;
 
 class CPU {
 private:
+    FILE* fp;
     int a, b, c, d, e, h, l, f, sp, pc;
-    int reg_backup[10];
+    int ime, halt;
     function<int()> ops[256];
     function<int()> cbops[256];
 public:
     CPU();
     int step();
-    void backup();
-    void restore();
     void opload();
 };
