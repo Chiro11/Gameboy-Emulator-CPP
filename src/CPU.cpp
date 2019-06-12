@@ -11,30 +11,30 @@ CPU::CPU() {
 
 int CPU::step() {
     int ret = 0;
-    int IE = memory.rb(0xFFFF);
-    int IF = memory.rb(0xFF0F);
-    if(halt)
-        ret = 1;
-    else {
+//    int IE = memory.rb(0xFFFF);
+//    int IF = memory.rb(0xFF0F);
+//    if(halt)
+//        ret = 1;
+//    else {
         int k = memory.rb(pc++);
         pc &= 0xFFFF;
         ret = ops[k]();
-    }
-    if(ime && IE && IF) {
-        halt = 0;
-        int tmp = IE&IF;
-        for(int i=0; i<5; i++) {
-            if(tmp&(1<<i)) {
-                ime = 0;
-                tmp -= (1<<i);
-                sp -= 2;
-                memory.ww(sp, pc);
-                pc = 0x40+i*0x08;
-                ret = 3;
-                break;
-            }
-        }
-    }
+//    }
+//    if(ime && IE && IF) {
+//        halt = 0;
+//        int tmp = IE&IF;
+//        for(int i=0; i<5; i++) {
+//            if(tmp&(1<<i)) {
+//                ime = 0;
+//                tmp -= (1<<i);
+//                sp -= 2;
+//                memory.ww(sp, pc);
+//                pc = 0x40+i*0x08;
+//                ret = 3;
+//                break;
+//            }
+//        }
+//    }
     return ret;
 }
 

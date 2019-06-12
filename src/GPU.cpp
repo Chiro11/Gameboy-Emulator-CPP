@@ -74,6 +74,7 @@ void GPU::randerLine() {
     if(lcdc&0x01) {
         int bgy = memory.rb(0xFF42)+row;
         int bgx = memory.rb(0xFF43);
+        int bgp = memory.rb(0xFF47);
         int bgtilemap = (lcdc>>3)&1;
         int bgtileset = (lcdc>>4)&1;
         int addr = bgy/8*32+bgx/8;
@@ -92,7 +93,8 @@ void GPU::randerLine() {
             int v = memory.rb(pos+1);
             int val = ((u>>(7-tile_x))&1)|(((v>>(7-tile_x))&1)<<1);
             curline[col] = val;
-            int color = palette[val];
+            int tmp = (bgp>>(val*2))&3;
+            int color = palette[tmp];
             Uint32* pixels = (Uint32*)surface->pixels;
             pixels[row*160+col] = SDL_MapRGB(surface->format, color, color, color);
             bgx++;
@@ -109,6 +111,11 @@ void GPU::randerLine() {
             int objx = memory.rb(addr+1)-8;
             int tile_id = memory.rb(addr+2);
             int objinfo = memory.rb(addr+3);
+            int objp;
+            if(objinfo&0x10)
+                objp = memory.rb(0xFF49);
+            else
+                objp = memory.rb(0xFF48);
             for(int col=objx; col<objx+8; col++) {
                 if(col<0 || col>=160)
                     continue;
@@ -130,7 +137,8 @@ void GPU::randerLine() {
                 int val = ((u>>(7-tile_x))&1)|(((v>>(7-tile_x))&1)<<1);
                 if(!val)
                     continue;
-                int color = palette[val];
+                int tmp = (objp>>(val*2))&3;
+                int color = palette[tmp];
                 Uint32* pixels = (Uint32*)surface->pixels;
                 pixels[row*160+col] = SDL_MapRGB(surface->format, color, color, color);
             }
