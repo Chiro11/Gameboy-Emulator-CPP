@@ -8,11 +8,11 @@ extern Memory memory;
 
 class Timer {
 private:
-    unsigned char div;
-    int div_clock, cnt_clock;
+    unsigned char divider;
+    int dividerClock, counterClock;
 public:
     Timer();
     void step(int time);
-    unsigned char get_div();
-    void div_reset();
+    unsigned char getDivider();
+    void dividerReset();
 };

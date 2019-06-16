@@ -7,13 +7,12 @@ extern Memory memory;
 
 class CPU {
 private:
-    FILE* fp;
-    int a, b, c, d, e, h, l, f, sp, pc;
     int ime, halt;
-    function<int()> ops[256];
-    function<int()> cbops[256];
+    int a, b, c, d, e, h, l, f, sp, pc;
+    function<int()> opcode[0x100];
+    function<int()> cb_opcode[0x100];
 public:
     CPU();
     int step();
-    void opload();
+    void loadOpcode();
 };

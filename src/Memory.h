@@ -1,28 +1,27 @@
 #pragma once
-#include <cstdio>
-#include <vector>
 #include <cstring>
 #include <fstream>
-#include "Key.h"
+#include <vector>
 #include "Timer.h"
+#include "Key.h"
 using namespace std;
 
 class Timer;
 
-extern Key key;
 extern Timer timer;
+extern Key key;
 
 class Memory {
 private:
-    int mbc_type, rom_bank, ram_bank, mode;
-    unsigned char mmu[65536];
+    int mbcType, mbcMode, romBank, ramBank;
+    unsigned char mmu[0x8000];
     vector<unsigned char> rom;
     vector<unsigned char> ram;
 public:
     Memory();
-    void load_rom();
-    int rb(int addr);
-    int rw(int addr);
-    void wb(int addr, int val);
-    void ww(int addr, int val);
+    bool loadRom(string& romName);
+    int readByte(int addr);
+    int readWord(int addr);
+    void writeByte(int addr, int val);
+    void writeWord(int addr, int val);
 };

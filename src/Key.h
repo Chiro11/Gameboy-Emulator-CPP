@@ -5,10 +5,10 @@ using namespace std;
 
 class Key {
 private:
-    int key[2];
+    int keys[2];
     SDL_Event e;
 public:
     Key();
-    bool keypress();
-    int getkey(int id);
+    bool press();
+    int getKey(int id);
 };

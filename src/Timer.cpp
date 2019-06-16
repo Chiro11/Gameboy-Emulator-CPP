@@ -2,38 +2,40 @@
 using namespace std;
 
 Timer::Timer() {
-    div = 0;
-    div_clock = cnt_clock = 0;
+    divider = 0;
+    dividerClock = counterClock = 0;
 }
 
+//Two timer registers
 void Timer::step(int time) {
-    div_clock += time;
-    div = (div+div_clock/64)&0xFF;
-    div_clock %= 64;
-    cnt_clock += time;
-    int cnt = memory.rb(0xFF05);
-    int ctrl = memory.rb(0xFF07);
-    int cycle = 0;
-    switch(ctrl&0x03) {
+    dividerClock += time;
+    divider = (divider+dividerClock/64)&0xFF;
+    dividerClock %= 64;
+    counterClock += time;
+    int counter = memory.readByte(0xFF05);
+    int control = memory.readByte(0xFF07);
+    int cycle;
+    switch(control&3) {
         case 0: cycle = 256; break;
         case 1: cycle = 4; break;
         case 2: cycle = 16; break;
         case 3: cycle = 64; break;
     }
-    cnt += cnt_clock/cycle;
-    cnt_clock %= cycle;
-    if(cnt>0xFF) {
-        cnt = memory.rb(0xFF06);
-        int IF = memory.rb(0xFF0F);
+    counter += counterClock/cycle;
+    counterClock %= cycle;
+    if(counter>0xFF) {
+        counter = memory.readByte(0xFF06);
+        int IF = memory.readByte(0xFF0F);
         IF |= 0x04;
-        memory.wb(0xFF0F, IF);
+        memory.writeByte(0xFF0F, IF);
     }
+    memory.writeByte(0xFF05, counter);
 }
 
-void Timer::div_reset() {
-    div = 0;
+void Timer::dividerReset() {
+    divider = 0;
 }
 
-unsigned char Timer::get_div() {
-    return div;
+unsigned char Timer::getDivider() {
+    return divider;
 }

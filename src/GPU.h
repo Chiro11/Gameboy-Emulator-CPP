@@ -11,10 +11,11 @@ private:
     SDL_Window* window;
     SDL_Surface* surface;
     int clock;
-    int curline[160];
+    int curLine[160];
 public:
     GPU();
-    void quit();
+    void init();
     void step(int time);
-    void randerLine();
+    void renderLine();
+    void quit();
 };

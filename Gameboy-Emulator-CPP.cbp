@@ -39,6 +39,8 @@
 		<Unit filename="src/Key.h" />
 		<Unit filename="src/Memory.cpp" />
 		<Unit filename="src/Memory.h" />
+		<Unit filename="src/Timer.cpp" />
+		<Unit filename="src/Timer.h" />
 		<Unit filename="src/main.cpp" />
 		<Extensions>
 			<code_completion />
